@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 
+VALID_LEVELS = {"INFO", "WARNING", "ERROR"}
+
 @dataclass
 class LogEntry:
     timestamp: str
@@ -13,7 +15,13 @@ def parse_line(line):
         return None
     
     timestamp = f"{parts[0]} {parts[1]}"
+
+
     level = parts[2]
+
+    if level not in VALID_LEVELS:
+        return None
+
     message = parts[3]
 
     return LogEntry(timestamp, level, message)
