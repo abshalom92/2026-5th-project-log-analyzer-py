@@ -1,4 +1,7 @@
 import argparse
+import json
+import csv
+import sys
 from analyzer.cli import load_log_file
 from analyzer.stats import count_levels, most_common_errors
 from analyzer.filter import filter_by_date
@@ -40,6 +43,13 @@ def parse_args():
         help="End date (inclusive) in YYYY-MM-DD format"
     )
 
+    parser.add_argument(
+        "--output",
+        choices=["text", "json", "csv"],
+        default="text",
+        help="Output format (default: text)"
+    )
+
     return parser.parse_args()
 
 
@@ -54,18 +64,48 @@ def main():
 
     entries = filter_by_date(entries, since=since_date, until=until_date)
 
-    
+    levels = count_levels(entries)
+    top_errors = most_common_errors(entries, args.top_errors)
 
-    print(f"Total entries: {len(entries)}")
+    results = {
+        "total_entries": len(entries),
+        "levels": dict(levels),
+        "top_errors": [
+            {"message": msg, "count": count}
+            for msg, count in top_errors
+        ]
+    }
 
-    if not args.errors_only:
-        levels = count_levels(entries)
-        for level, count in levels.items():
-            print(f"{level}: {count}")
-    
-    print("\nMost common errors:")
-    for message, count in most_common_errors(entries, args.top_errors):
-        print(f"{count}x - {message}")
+    if args.output == "text":
+        print(f"Total entries: {results['total_entries']}")
+        
+        if not args.errors_only:
+            for level, count in results["levels"].items():
+                print(f"{level}: {count}")
+
+        print("\nMost common errors:")
+        for error in results["top_errors"]:
+            print(f"{error['count']}x - {error['message']}")
+        
+    elif args.output == "json":
+        print(json.dumps(results, indent=2))
+
+    elif args.output == "csv":
+        writer = csv.writer(sys.stdout)
+
+        writer.writerow(["Metric", "Value"])
+        writer.writerow(["Total Entries", results["total_entries"]])
+
+        writer.writerow([])
+        writer.writerow(["Level", "Count"])
+        for level, count in results["levels"].items():
+            writer.writerow([level, count])
+        
+        writer.writerow([])
+        writer.writerow(["Error Message", "Count"])
+        for error in results["top_errors"]:
+            writer.writerow([error["message"], error["count"]])
+
 
 if __name__ == "__main__":
     main()
